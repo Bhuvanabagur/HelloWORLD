@@ -1,0 +1,213 @@
+Creating simple Helo-world CI/CD Project
+
+
+STEP1:-Lauch the EC2 instance t2.micro t3a.medium
+   -->jenkin master
+   -->ansible master
+-  -->Kubernetes Master(1 node)
+   -->Docker (sonarqube,nexus)
+  
+
+Installation of jenkins Using these commands
+-->JAVA installation
+yum update
+sudo yum install -y java-1.8.0-openjdk-devel
+
+Jenkins installation
+curl --silent --location http://pkg.jenkins-ci.org/redhat/jenkins.repo | sudo tee /etc/yum.repos.d/jenkins.repo
+
+sudo rpm --import https://pkg.jenkins.io/redhat/jenkins.io.key
+
+sudo yum install jenkins --nogpgcheck
+
+After completion of the installation start and enable the jenkins
+systemctl start jenkins-->for start the jenkins
+systemctl enable jenkins--->for enable the jenkins
+sytemctl status jenkins-->cheacking the status whether jenkins is active or no
+chkconfig jenkins on
+
+After this check in URL using public ip 
+http://<IP>:8080
+
+Copy the url from the location mentioned in the initial page
+/var/lib/jenkins/secrets/initialAdminPassword
+
+
+Install all default plugin
+
+Install maven
+sudo yum install -y maven
+
+Configure Git,maven,java --> in the Global tool configuration  
+Login to Jenkins
+
+Install kubernetes
+
+
+# Update hosts file
+echo "[TASK 1] Update /etc/hosts file"
+cat >>/etc/hosts<<EOF
+192.168.76.20 kmaster kmaster
+192.168.76.21 kworker kworker
+EOF
+
+# Install docker from Docker-ce repository
+echo "[TASK 2] Install docker container engine"
+yum install -y -q yum-utils device-mapper-persistent-data lvm2 > /dev/null 2>&1
+yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo > /dev/null 2>&1
+yum install -y -q docker-ce >/dev/null 2>&1
+
+# Enable docker service
+echo "[TASK 3] Enable and start docker service"
+systemctl enable docker >/dev/null 2>&1
+systemctl start docker
+
+# Disable SELinux
+echo "[TASK 4] Disable SELinux"
+setenforce 0
+sed -i --follow-symlinks 's/^SELINUX=enforcing/SELINUX=disabled/' /etc/sysconfig/selinux
+
+# Stop and disable firewalld
+echo "[TASK 5] Stop and Disable firewalld"
+systemctl disable firewalld >/dev/null 2>&1
+systemctl stop firewalld
+
+# Add sysctl settings
+echo "[TASK 6] Add sysctl settings"
+cat >>/etc/sysctl.d/kubernetes.conf<<EOF
+net.bridge.bridge-nf-call-ip6tables = 1
+net.bridge.bridge-nf-call-iptables = 1
+EOF
+sysctl --system >/dev/null 2>&1
+
+# Disable swap
+echo "[TASK 7] Disable and turn off SWAP"
+sed -i '/swap/d' /etc/fstab
+swapoff -a
+
+# Add yum repo file for Kubernetes
+echo "[TASK 8] Add yum repo file for kubernetes"
+cat >>/etc/yum.repos.d/kubernetes.repo<<EOF
+[kubernetes]
+name=Kubernetes
+baseurl=https://packages.cloud.google.com/yum/repos/kubernetes-el7-x86_64
+enabled=1
+gpgcheck=1
+repo_gpgcheck=1
+gpgkey=https://packages.cloud.google.com/yum/doc/yum-key.gpg
+        https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
+EOF
+
+# Install Kubernetes
+echo "[TASK 9] Install Kubernetes (kubeadm, kubelet and kubectl)"
+yum install -y -q kubeadm-1.18.9 kubelet-1.18.9 kubectl-1.18.9 >/dev/null 2>&1
+
+# Start and Enable kubelet service
+echo "[TASK 10] Enable and start kubelet service"
+systemctl enable kubelet >/dev/null 2>&1
+systemctl start kubelet >/dev/null 2>&1
+
+# Enable ssh password authentication
+echo "[TASK 11] Enable ssh password authentication"
+sed -i 's/^PasswordAuthentication no/PasswordAuthentication yes/' 
+systemctl reload sshd
+
+# Set Root password
+echo "[TASK 12] Set root password"
+echo "kubeadmin" | passwd --stdin root 
+
+# Update vagrant user's bashrc file
+echo "export TERM=xterm" >>
+
+
+Install docker
+
+Create the user 
+
+Execute the below instructions
+
+1.yum install docker -yum
+2. sudo gropuadd docker
+3. sudo usermod -aG docker jenkins
+4. usermod -aG docker ec2-user
+
+
+ t3a.medium Instance 
+	install java ,docker ,
+	yum install java-11* -y
+
+	Install DOCKER:-
+	yum install docker -y
+	nexus installation
+    yum update -y
+    yum install docker -y
+     docker start 
+     chkconfig docker on 
+            status docker
+            using the docker image install nexus and  sonarqube
+            docker run -d -p 8081:8081 -p 8082:8082 -p 8085:8085 --name nexus sonatype/nexus:oss
+            docker run -d -p 9000:9000 --name sonar sonarqube
+	       
+	
+	In nexus integrate maven repo
+	create a hosted snapshot Repository and hosted Realease repository
+	create proxy repo 
+	create group repository
+	
+Add in  project pom.xml
+
+<distributionManagement>
+  <repository>
+    <id>bhuvana</id>
+    <url>http://18.116.45.98:8081/nexus/content/repositories/maven-hosted-release</url>
+  </repository>
+  <snapshotRepository>
+    <id>bhuvana</id>
+    <url>http://18.116.45.98:8081/nexus/content/repositories/maven-hosted-snapshot</url>
+  </snapshotRepository>
+</distributionManagement>
+
+  vi /opt/maven/apache-maven-3.6.3/conf
+
+<server>
+  <id>bhuvana</id>
+  <username>admin</username>
+  <password>admin123</password>
+</server>
+------------------------
+Accessing SonarQube
+Nexus runs at port 9000, 
+http://Public IP:9000
+
+ configure sonarqube 
+create a project
+generate token
+select maven
+
+mvn sonar:sonar /
+  -Dsonar.projectKey=bhuvana /
+  -Dsonar.host.url=http://18.116.45.98:9000 /
+  -Dsonar.login=caaba703a3a9a6868f7748cca66614d0dc445cca
+  
+  
+  After cofiguration set up
+  
+  In your Jenkins console click on New Item from where you will create your first job
+   After you click on New Item 
+              freestyle project 
+              configure Git In git mention  the github repo url.
+              In  Build option select  Execute shell
+			  shell command mvn clean 
+			  install docker 
+			  docker build -t java-web-app-project.
+			  if (docker ps -a | grep 'java-web-app-cicd') then 
+			  docker stop java-web-app-project docker rm -f java-web-app-cicd
+			  fi docker run -d -p 8888:8080 --name java-web-app-cicd java-web-app-project 
+			  mvn test docker login -u -p docker commit java-web-app-cicd /java-web-app-project docker push
+   			  /java-web-app-project:
+kubectl delete deploy --all kubectl create -f deploy-tomcat.yaml
+
+select poll scm for Continuous integration and deployment purpose.
+  
+  
+ 
